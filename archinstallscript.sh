@@ -60,15 +60,25 @@ arch-chroot /mnt ln -sf /usr/share/zoneinfo/$time_zone /etc/localtime
 
 arch-chroot /mnt hwclock --systohc
 
+
+read -p "Enter UTF-8 locale (e.g., en_US): " locale
+
+arch-chroot /mnt sed -i \
+    "/^#${locale}\.UTF-8 UTF-8$/s/^#//" \
+    /etc/locale.gen
+
+arch-chroot /mnt locale-gen
+
+arch-chroot /mnt bash -c \
+    "echo 'LANG=${locale}.UTF-8' > /etc/locale.conf"
+
+arch-chroot /mnt bash -c "echo 'KEYMAP=us' > /etc/vconsole.conf"
+
 read -p "Enter UTF-8 locale (e.g., en_US): " locale
 
 arch-chroot /mnt sed -i "/^#\?${locale}\.UTF-8 UTF-8$/s/^#//" /etc/locale.gen
 
 arch-chroot /mnt locale-gen
-
-arch-chroot /mnt bash -c "echo 'KEYMAP=us' > /etc/vconsole.conf"
-
-arch-chroot /mnt bash -c "echo 'LANG=${locale}.UTF-8' > /etc/locale.conf"
 
 read -p "Enter your desired hostname: " hostname
 
