@@ -30,10 +30,62 @@ if [[ "$DISK" == "nvme" ]]; then
   mkfs.fat -F32 ${DISK}p1
   mkswap ${DISK}p2
   mkfs.ext4 ${DISK}p3
-elif [[ "DISK" == "sd" ]]; then
+elif [[ "$DISK" == "sd" ]]; then
   mkfs.fat -F32 ${DISK}1
   mkswap ${DISK}2
   mkfs.ext4 ${DISK}3
 else
   exit
 fi
+
+if [[ "$DISK" == "nvme" ]]; then
+  mount ${DISK}p3 /mnt
+  mount --mkdir ${DISK}p1 /mnt/boot
+  swapon ${DISK}p2
+elif [[ "$DISK" == "sd" ]]; then
+  mount ${DISK}3 /mnt
+  mount --mkdir ${DISK}1 /mnt/boot
+  swapon ${DISK}2
+else
+  exit
+fi
+
+pacstrap -K /mnt base linux linux-firmware nano NetworkManager vi sudo grub efibootmgr
+
+genfstab -U /mnt >> /mnt/etc/fstab
+
+read -p "Enter time zone (e.g., America/New_York): " time_zone
+
+arch-chroot -S /mnt ln -sf /usr/share/zoneinfo/$time_zone /etc/localtime
+
+arch-chroot -S /mnt hwclock --systohc
+
+read -p "Enter UTF-8 locale (e.g., en_US): " locale
+
+arch-chroot -S /mnt sed -i "/^#\?${locale}\.UTF-8 UTF-8$/s/^#//" /etc/locale.gen
+
+arch-chroot -S /mnt echo "LANG=${locale}.UTF-8" > /etc/locale.conf
+
+read -p "Enter your desired hostname: " hostname
+
+arch-chroot -S /mnt echo "${hostname}" > /etc/hostname
+
+arch-chroot -S /mnt mkinitcpio -P
+
+arch-chroot -S /mnt passwd
+
+arch-chroot -S /mnt grub-install --removable --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
+
+grub-mkconfig -o /boot/grub/grub.cfg
+
+umount /R /mnt
+
+echo "Remove media then press enter to reboot."
+
+read -s -n 1
+
+echo "Rebooting..."
+
+sleep 2
+
+reboot
