@@ -50,7 +50,7 @@ else
   exit
 fi
 
-pacstrap -K /mnt base linux linux-firmware nano NetworkManager vi sudo grub efibootmgr
+pacstrap -K /mnt base linux linux-firmware nano networkmanager vi sudo grub efibootmgr
 
 genfstab -U /mnt >> /mnt/etc/fstab
 
