@@ -112,9 +112,7 @@ system_prep () {
   echo "Setting locales..."
   arch-chroot /mnt ln -sf /usr/share/zoneinfo/"$time_zone" /etc/localtime > /dev/null
   arch-chroot /mnt hwclock --systohc > /dev/null
-  arch-chroot /mnt sed -i \
-    "/^#${locale}\.UTF-8 UTF-8$/s/^#//" \
-    /etc/locale.gen
+  arch-chroot /mnt sed -i "/${locale}\.UTF-8/s/^#\s*//" /etc/locale.gen
   arch-chroot /mnt locale-gen > /dev/null
   echo "LANG=${locale}.UTF-8" > /mnt/etc/locale.conf
   echo 'KEYMAP=us' > /mnt/etc/vconsole.conf
