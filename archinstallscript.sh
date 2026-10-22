@@ -14,9 +14,9 @@ lsblk
 
 read -p "Enter the disk identifier (e.g., /dev/sdX): " DISK
 
-wipefs -af $DISK
+wipefs -af "$DISK"
 
-sfdisk $DISK <<'EOF'
+sfdisk "$DISK" <<'EOF'
 label: gpt
 
 size=1G, type=U
@@ -24,7 +24,7 @@ size=8G, type=swap
 type=linux
 EOF
 
-partprobe $DISK
+partprobe "$DISK"
 
 if [[ "$DISK" =~ nvme ]]; then
   mkfs.fat -F32 ${DISK}p1
@@ -74,15 +74,13 @@ read -p "Enter your desired hostname: " hostname
 
 arch-chroot /mnt "echo '$hostname' > /etc/hostname"
 
-arch-chroot /mnt mkinitcpio -P
-
 arch-chroot /mnt passwd
 
 arch-chroot /mnt grub-install --removable --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
 
 arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
 
-umount /R /mnt
+umount -R /mnt
 
 echo "Remove media then press enter to reboot."
 
