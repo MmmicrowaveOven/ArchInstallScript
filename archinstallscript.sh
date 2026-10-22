@@ -68,7 +68,7 @@ arch-chroot -S /mnt echo "LANG=${locale}.UTF-8" > /etc/locale.conf
 
 read -p "Enter your desired hostname: " hostname
 
-arch-chroot -S /mnt echo "${hostname}" > /etc/hostname
+arch-chroot -S /mnt echo $hostname > /etc/hostname
 
 arch-chroot -S /mnt mkinitcpio -P
 
