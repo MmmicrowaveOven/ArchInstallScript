@@ -19,18 +19,18 @@ wipefs -af $DISK
 sfdisk $DISK <<'EOF'
 label: gpt
 
-size=1G, type=uefi
+size=1G, type=U
 size=8G, type=swap
 type=linux
 EOF
 
 partprobe $DISK
 
-if [[ "$DISK" == /dev/nvme* ]]; then
+if [[ "$DISK" =~ nvme ]]; then
   mkfs.fat -F32 ${DISK}p1
   mkswap ${DISK}p2
   mkfs.ext4 ${DISK}p3
-elif [[ "$DISK" == /dev/sd* ]]; then
+elif [[ "$DISK" =~ sd ]]; then
   mkfs.fat -F32 ${DISK}1
   mkswap ${DISK}2
   mkfs.ext4 ${DISK}3
@@ -38,11 +38,11 @@ else
   exit
 fi
 
-if [[ "$DISK" == /dev/nvme0 ]]; then
+if [[ "$DISK" =~ nvme ]]; then
   mount ${DISK}p3 /mnt
   mount --mkdir ${DISK}p1 /mnt/boot
   swapon ${DISK}p2
-elif [[ "$DISK" == /dev/sd* ]]; then
+elif [[ "$DISK" =~ sd ]]; then
   mount ${DISK}3 /mnt
   mount --mkdir ${DISK}1 /mnt/boot
   swapon ${DISK}2
