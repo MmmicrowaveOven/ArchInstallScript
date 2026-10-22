@@ -1,11 +1,11 @@
 #!/bin/bash
+set -euo pipefall
 
 main () {
   verify_platform
   gather_input
   verify_disk_deletion
-  wipe_disk
-  timedatectl
+  timedatectl set-ntp true
   system_prep
   cleanup
 }
@@ -35,14 +35,20 @@ gather_input () {
 }
 
 verify_disk_deletion () {
-  lsblk
-  read -p "Enter the disk identifier to install Arch Linux. THIS DISK WILL BE WIPED. (e.g., /dev/sdX): " DISK
+  while true; do
+    lsblk
+    read -p "Enter the disk identifier to install Arch Linux. THIS DISK WILL BE WIPED. (e.g., /dev/sdX): " DISK
+    if [[ ! -b "$DISK" ]]; then
+      echo "Invalid block device. Try again."
+    elif [[ -b "$DISK" ]]; then
+      break
+    fi
   while true; do
     read -p 'ARE YOU SURE YOU WANT TO WIPE THIS DISK? ALL DATA WILL BE DELETED. "Y" WILL CONTINUE, "N" WILL GO BACK TO DEVICE SELECTION' verify_wipe_disk
-    if [[ "$verify_wipe_disk" == "Y" ]]; then
+    if [[ "${verify_wipe_disk^^}" == "Y" ]]; then
       wipe_disk
       break
-    elif [[ "$verify_wipe_disk" == "N" ]]; then
+    elif [[ "${verify_wipe_disk^^}" == "N" ]]; then
       verify_disk_deletion
       break
     fi
@@ -61,27 +67,27 @@ wipe_disk () {
 EOF
     
   partprobe "$DISK" > /dev/null
-  
+  udevadm settle
   if [[ "$DISK" =~ nvme ]]; then
-    mkfs.fat -F32 ${DISK}p1 > /dev/null
-    mkswap ${DISK}p2 > /dev/null
-    mkfs.ext4 ${DISK}p3 > /dev/null
+    mkfs.fat -F32 "${DISK}"p1 > /dev/null
+    mkswap "${DISK}"p2 > /dev/null
+    mkfs.ext4 "${DISK}"p3 > /dev/null
   elif [[ "$DISK" =~ sd ]]; then
-    mkfs.fat -F32 ${DISK}1 > /dev/null
-    mkswap ${DISK}2 > /dev/null
-    mkfs.ext4 ${DISK}3 > /dev/null
+    mkfs.fat -F32 "${DISK}"1 > /dev/null
+    mkswap "${DISK}"2 > /dev/null
+    mkfs.ext4 "${DISK}"3 > /dev/null
   else
     exit
   fi
   
   if [[ "$DISK" =~ nvme ]]; then
-    mount ${DISK}p3 /mnt > /dev/null
-    mount --mkdir ${DISK}p1 /mnt/boot > /dev/null
-    swapon ${DISK}p2 > /dev/null
+    mount "${DISK}"p3 /mnt > /dev/null
+    mount --mkdir "${DISK}"p1 /mnt/boot > /dev/null
+    swapon "${DISK}"p2 > /dev/null
   elif [[ "$DISK" =~ sd ]]; then
-    mount ${DISK}3 /mnt > /dev/null
-    mount --mkdir ${DISK}1 /mnt/boot > /dev/null
-    swapon ${DISK}2 > /dev/null
+    mount "${DISK}"3 /mnt > /dev/null
+    mount --mkdir "${DISK}"1 /mnt/boot > /dev/null
+    swapon "${DISK}"2 > /dev/null
   else
     exit
   fi
@@ -90,12 +96,13 @@ EOF
 system_prep () {
   echo "Installing base system..."
   pacstrap -K /mnt base linux linux-firmware nano networkmanager vi sudo grub efibootmgr  > /dev/null
+  arch-chroot /mnt systemctl enable NetworkManager > /dev/null
   echo "Base system installed."
   echo "Generating file /etc/fstab."
-  genfstab -U /mnt >> /mnt/etc/fstab > /dev/null
+  genfstab -U /mnt >> /mnt/etc/fstab
   echo "File /etc/fstab generated."
   echo "Setting locales..."
-  arch-chroot /mnt ln -sf /usr/share/zoneinfo/$time_zone /etc/localtime > /dev/null
+  arch-chroot /mnt ln -sf /usr/share/zoneinfo/"$time_zone" /etc/localtime > /dev/null
   arch-chroot /mnt hwclock --systohc > /dev/null
   arch-chroot /mnt sed -i \
     "/^#${locale}\.UTF-8 UTF-8$/s/^#//" \
@@ -104,11 +111,19 @@ system_prep () {
   arch-chroot /mnt bash -c \
     "echo 'LANG=${locale}.UTF-8' > /etc/locale.conf"
   arch-chroot /mnt bash -c "echo 'KEYMAP=us' > /etc/vconsole.conf" > /dev/null
-  arch-chroot /mnt sed -i "/^#\?${locale}\.UTF-8 UTF-8$/s/^#//" /etc/locale.gen > /dev/null
-  arch-chroot /mnt locale-gen > /dev/null
+  echo "Locales set."
+  echo "Setting hostname..."
   arch-chroot /mnt bash -c "echo '$hostname' > /etc/hostname" > /dev/null
-  arch-chroot /mnt grub-install --removable --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB > /dev/null
+  echo "Hostname set."
+  echo "Installing grub..."
+  if [[ "platform_size" == "64" ]]; then
+    arch-chroot /mnt grub-install --removable --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB > /dev/null
+  elif [[ "platform_size" == "32" ]]; then
+    arch-chroot /mnt grub-install --removable --target=i386-efi --efi-directory=/boot --bootloader-id=GRUB > /dev/null
+  fi
   arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg > /dev/null
+  echo "Grub installed."
+  echo "Set root user password:"
   arch-chroot /mnt passwd
 }
 
