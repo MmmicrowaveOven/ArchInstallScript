@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefall
+set -euo pipefail
 
 main () {
   verify_platform
@@ -11,48 +11,51 @@ main () {
 }
 
 verify_platform () {
-  platform_size=$(cat /sys/firmware/efi/fw_platform_size)
-  if [[ "$platform_size" == "64" ]]; then
-    echo "This system is running in 64-bit UEFI mode."
-  elif [[ "$platform_size" == "32" ]]; then
-    echo "This system is running in 32-bit UEFI mode."
-  else
+  if [[ ! -f /sys/firmware/efi/fw_platform_size ]]; then
     echo "This system is not running in UEFI mode. Press any key to reboot and try again."
-    read -s -n 1
+    read -s -n1
     echo "Rebooting..."
     sleep 2
     reboot
   fi
+  platform_size=$(< /sys/firmware/efi/fw_platform_size)
+  if [[ "$platform_size" == "64" ]]; then
+    echo "This system is running in 64-bit UEFI mode."
+  elif [[ "$platform_size" == "32" ]]; then
+    echo "This system is running in 32-bit UEFI mode."
+  fi
 }
 
 gather_input () {
-  hostname="archlinux"
-  time_zone="America/New_York"
-  locale="en_US"
-  read -p "Enter your desired hostname (Default > archlinux): " hostname
-  read -p "Enter time zone (Default >  America/New_York): " time_zone
-  read -p "Enter UTF-8 locale (Default > en_US): " locale
+  read -p "Enter your desired hostname (Default > archlinux): " input
+  system_hostname=${input:-archlinux}
+  read -p "Enter time zone (Default > America/New_York): " input
+  time_zone=${input:-America/New_York}
+  read -p "Enter UTF-8 locale (Default > en_US): " input
+  locale=${input:-en_US}
 }
 
 verify_disk_deletion () {
   while true; do
-    lsblk
-    read -p "Enter the disk identifier to install Arch Linux. THIS DISK WILL BE WIPED. (e.g., /dev/sdX): " DISK
-    if [[ ! -b "$DISK" ]]; then
-      echo "Invalid block device. Try again."
-    elif [[ -b "$DISK" ]]; then
-      break
-    fi
-  while true; do
-    read -p 'ARE YOU SURE YOU WANT TO WIPE THIS DISK? ALL DATA WILL BE DELETED. "Y" WILL CONTINUE, "N" WILL GO BACK TO DEVICE SELECTION' verify_wipe_disk
-    if [[ "${verify_wipe_disk^^}" == "Y" ]]; then
-      wipe_disk
-      break
-    elif [[ "${verify_wipe_disk^^}" == "N" ]]; then
-      verify_disk_deletion
-      break
-    fi
-    echo "Invalid input, try again"
+    while true; do
+      lsblk
+      read -p "Enter the disk identifier to install Arch Linux. THIS DISK WILL BE WIPED. (e.g., /dev/sdX): " DISK
+      if [[ "$(lsblk -dn -o TYPE "$DISK")" != "disk" ]]; then
+        echo "Invalid block device. Try again."
+      elif [[ -b "$DISK" ]]; then
+        break
+      fi
+    done
+    while true; do
+      read -p 'ARE YOU SURE YOU WANT TO WIPE THIS DISK? ALL DATA WILL BE DELETED. "Y" WILL CONTINUE, "N" WILL GO BACK TO DEVICE SELECTION: ' verify_wipe_disk
+      if [[ "${verify_wipe_disk^^}" == "Y" ]]; then
+        wipe_disk
+        break
+      elif [[ "${verify_wipe_disk^^}" == "N" ]]; then
+        continue 2
+      fi
+      echo "Invalid input, try again"
+    done
   done
 }
 
@@ -99,7 +102,7 @@ system_prep () {
   arch-chroot /mnt systemctl enable NetworkManager > /dev/null
   echo "Base system installed."
   echo "Generating file /etc/fstab."
-  genfstab -U /mnt >> /mnt/etc/fstab
+  genfstab -U /mnt > /mnt/etc/fstab
   echo "File /etc/fstab generated."
   echo "Setting locales..."
   arch-chroot /mnt ln -sf /usr/share/zoneinfo/"$time_zone" /etc/localtime > /dev/null
@@ -113,12 +116,12 @@ system_prep () {
   arch-chroot /mnt bash -c "echo 'KEYMAP=us' > /etc/vconsole.conf" > /dev/null
   echo "Locales set."
   echo "Setting hostname..."
-  arch-chroot /mnt bash -c "echo '$hostname' > /etc/hostname" > /dev/null
+  arch-chroot /mnt bash -c "echo '$system_hostname' > /etc/hostname" > /dev/null
   echo "Hostname set."
   echo "Installing grub..."
-  if [[ "platform_size" == "64" ]]; then
+  if [[ "$platform_size" == "64" ]]; then
     arch-chroot /mnt grub-install --removable --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB > /dev/null
-  elif [[ "platform_size" == "32" ]]; then
+  elif [[ "$platform_size" == "32" ]]; then
     arch-chroot /mnt grub-install --removable --target=i386-efi --efi-directory=/boot --bootloader-id=GRUB > /dev/null
   fi
   arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg > /dev/null
@@ -129,6 +132,7 @@ system_prep () {
 
 cleanup () {
   umount -R /mnt
+  swapoff -a
   echo "Remove media then press enter to reboot."
   read -s -n 1
   echo "Rebooting..."
