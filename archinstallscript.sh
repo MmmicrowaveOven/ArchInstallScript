@@ -76,7 +76,7 @@ arch-chroot -S /mnt passwd
 
 arch-chroot -S /mnt grub-install --removable --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
 
-grub-mkconfig -o /boot/grub/grub.cfg
+arch-chroot -S /mnt grub-mkconfig -o /boot/grub/grub.cfg
 
 umount /R /mnt
 
