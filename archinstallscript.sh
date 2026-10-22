@@ -8,3 +8,10 @@ else
   echo "this is not 64"
 fi
 
+timedatectl
+
+lsblk
+
+read -p "Enter the disk identifier (e.g., /dev/sdX): " DISK
+
+echo "$DISK"
