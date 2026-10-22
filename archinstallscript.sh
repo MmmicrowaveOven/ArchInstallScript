@@ -1,5 +1,6 @@
 #!/bin/bash
 set -euo pipefail
+trap 'echo "Installation failed on line $LINENO."' ERR
 
 main () {
   verify_platform
@@ -43,12 +44,9 @@ verify_disk_deletion () {
       if ! lsblk -dn -o TYPE "$DISK" >/dev/null 2>&1; then
         echo "Invalid block device."
         continue
-      fi
-
-      if [[ "$(lsblk -dn -o TYPE "$DISK")" != "disk" ]]; then
+      elif [[ "$(lsblk -dn -o TYPE "$DISK")" != "disk" ]]; then
         echo "Please select a whole disk."
         continue
-      fi
       elif [[ -b "$DISK" ]]; then
         break
       fi
