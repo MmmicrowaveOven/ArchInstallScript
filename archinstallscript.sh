@@ -40,8 +40,15 @@ verify_disk_deletion () {
     while true; do
       lsblk
       read -p "Enter the disk identifier to install Arch Linux. THIS DISK WILL BE WIPED. (e.g., /dev/sdX): " DISK
+      if ! lsblk -dn -o TYPE "$DISK" >/dev/null 2>&1; then
+        echo "Invalid block device."
+        continue
+      fi
+
       if [[ "$(lsblk -dn -o TYPE "$DISK")" != "disk" ]]; then
-        echo "Invalid block device. Try again."
+        echo "Please select a whole disk."
+        continue
+      fi
       elif [[ -b "$DISK" ]]; then
         break
       fi
@@ -50,7 +57,7 @@ verify_disk_deletion () {
       read -p 'ARE YOU SURE YOU WANT TO WIPE THIS DISK? ALL DATA WILL BE DELETED. "Y" WILL CONTINUE, "N" WILL GO BACK TO DEVICE SELECTION: ' verify_wipe_disk
       if [[ "${verify_wipe_disk^^}" == "Y" ]]; then
         wipe_disk
-        break
+        return
       elif [[ "${verify_wipe_disk^^}" == "N" ]]; then
         continue 2
       fi
@@ -64,7 +71,7 @@ wipe_disk () {
   sfdisk "$DISK" <<'EOF'
   label: gpt
 
-  size=1G, type=U
+  size=1G, type=uefi
   size=8G, type=swap
   type=linux
 EOF
@@ -111,12 +118,11 @@ system_prep () {
     "/^#${locale}\.UTF-8 UTF-8$/s/^#//" \
     /etc/locale.gen
   arch-chroot /mnt locale-gen > /dev/null
-  arch-chroot /mnt bash -c \
-    "echo 'LANG=${locale}.UTF-8' > /etc/locale.conf"
-  arch-chroot /mnt bash -c "echo 'KEYMAP=us' > /etc/vconsole.conf" > /dev/null
+  echo "LANG=${locale}.UTF-8" > /mnt/etc/locale.conf
+  echo 'KEYMAP=us' > /mnt/etc/vconsole.conf
   echo "Locales set."
   echo "Setting hostname..."
-  arch-chroot /mnt bash -c "echo '$system_hostname' > /etc/hostname" > /dev/null
+  echo "$system_hostname" > /mnt/etc/hostname
   echo "Hostname set."
   echo "Installing grub..."
   if [[ "$platform_size" == "64" ]]; then
@@ -131,8 +137,9 @@ system_prep () {
 }
 
 cleanup () {
-  umount -R /mnt
   swapoff -a
+  umount -R /mnt
+  sync
   echo "Remove media then press enter to reboot."
   read -s -n 1
   echo "Rebooting..."
