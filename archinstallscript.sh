@@ -56,27 +56,31 @@ genfstab -U /mnt >> /mnt/etc/fstab
 
 read -p "Enter time zone (e.g., America/New_York): " time_zone
 
-arch-chroot -S /mnt ln -sf /usr/share/zoneinfo/$time_zone /etc/localtime
+arch-chroot /mnt ln -sf /usr/share/zoneinfo/$time_zone /etc/localtime
 
-arch-chroot -S /mnt hwclock --systohc
+arch-chroot /mnt hwclock --systohc
 
 read -p "Enter UTF-8 locale (e.g., en_US): " locale
 
-arch-chroot -S /mnt sed -i "/^#\?${locale}\.UTF-8 UTF-8$/s/^#//" /etc/locale.gen
+arch-chroot /mnt sed -i "/^#\?${locale}\.UTF-8 UTF-8$/s/^#//" /etc/locale.gen
 
-arch-chroot -S /mnt echo "LANG=${locale}.UTF-8" > /etc/locale.conf
+arch-chroot /mnt locale-gen
+
+arch-chroot /mnt "echo 'KEYMAP=us' > /etc/vconsole.conf"
+
+arch-chroot /mnt "echo 'LANG=${locale}.UTF-8' > /etc/locale.conf"
 
 read -p "Enter your desired hostname: " hostname
 
-arch-chroot -S /mnt echo $hostname > /etc/hostname
+arch-chroot /mnt "echo '$hostname' > /etc/hostname"
 
-arch-chroot -S /mnt mkinitcpio -P
+arch-chroot /mnt mkinitcpio -P
 
-arch-chroot -S /mnt passwd
+arch-chroot /mnt passwd
 
-arch-chroot -S /mnt grub-install --removable --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
+arch-chroot /mnt grub-install --removable --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
 
-arch-chroot -S /mnt grub-mkconfig -o /boot/grub/grub.cfg
+arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
 
 umount /R /mnt
 
