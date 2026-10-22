@@ -26,11 +26,11 @@ EOF
 
 partprobe $DISK
 
-if [[ "$DISK" == "nvme" ]]; then
+if [[ "$DISK" == /dev/nvme* ]]; then
   mkfs.fat -F32 ${DISK}p1
   mkswap ${DISK}p2
   mkfs.ext4 ${DISK}p3
-elif [[ "$DISK" == "sd" ]]; then
+elif [[ "$DISK" == /dev/sd* ]]; then
   mkfs.fat -F32 ${DISK}1
   mkswap ${DISK}2
   mkfs.ext4 ${DISK}3
@@ -38,11 +38,11 @@ else
   exit
 fi
 
-if [[ "$DISK" == "nvme" ]]; then
+if [[ "$DISK" == /dev/nvme0 ]]; then
   mount ${DISK}p3 /mnt
   mount --mkdir ${DISK}p1 /mnt/boot
   swapon ${DISK}p2
-elif [[ "$DISK" == "sd" ]]; then
+elif [[ "$DISK" == /dev/sd* ]]; then
   mount ${DISK}3 /mnt
   mount --mkdir ${DISK}1 /mnt/boot
   swapon ${DISK}2
