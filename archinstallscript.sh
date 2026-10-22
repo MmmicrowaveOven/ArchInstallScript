@@ -66,13 +66,13 @@ arch-chroot /mnt sed -i "/^#\?${locale}\.UTF-8 UTF-8$/s/^#//" /etc/locale.gen
 
 arch-chroot /mnt locale-gen
 
-arch-chroot /mnt "echo 'KEYMAP=us' > /etc/vconsole.conf"
+arch-chroot /mnt bash -c "echo 'KEYMAP=us' > /etc/vconsole.conf"
 
-arch-chroot /mnt "echo 'LANG=${locale}.UTF-8' > /etc/locale.conf"
+arch-chroot /mnt bash -c "echo 'LANG=${locale}.UTF-8' > /etc/locale.conf"
 
 read -p "Enter your desired hostname: " hostname
 
-arch-chroot /mnt "echo '$hostname' > /etc/hostname"
+arch-chroot /mnt bash -c "echo '$hostname' > /etc/hostname"
 
 arch-chroot /mnt passwd
 
