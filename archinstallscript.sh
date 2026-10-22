@@ -14,4 +14,4 @@ lsblk
 
 read -p "Enter the disk identifier (e.g., /dev/sdX): " DISK
 
-wipefs -af /dev/$DISK
+wipefs -af $DISK
