@@ -136,7 +136,7 @@ get_timezone () {
   while true; do
     read -p "Enter time zone (Default > America/New_York): " tz_input
     time_zone=${tz_input:-America/New_York}
-    if [[ -f "/usr/share/zoneinfo/$tz_input" ]]; then
+    if [[ -f "/usr/share/zoneinfo/$time_zone" ]]; then
       break
     else
       echo "Invalid input. Try again."
@@ -148,7 +148,7 @@ get_locale () {
   while true; do
     read -p "Enter UTF-8 locale (Default > en_US): " locale_input
     locale=${locale_input:-en_US}
-    if grep -q "^#\?${locale_input}\.UTF-8" /etc/locale.gen; then
+    if grep -q "^#\?${locale}\.UTF-8" /etc/locale.gen; then
       break
     else
       echo "Invalid input. Try again."
