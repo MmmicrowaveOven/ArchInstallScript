@@ -240,9 +240,9 @@ password_confirm () {
       read -s -p "Confirm your desired password: " password_input_2
       echo
       if [[ "$password_input_1" == "$password_input_2" ]]; then
-        unset password_input_1 password_input_2
         echo "Passwords match."
         password="$password_input_1"
+        unset password_input_1 password_input_2
         break
       else
         echo "Password do not match. Try again."
