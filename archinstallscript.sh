@@ -45,7 +45,7 @@ check_platform () {
 }
 
 check_networking() {
-    if ping -c1 archlinux.org >/dev/null 2>&1; then
+    if [ ping -c1 archlinux.org >/dev/null 2>&1 ]; then
         echo "Network connectivity confirmed."
     else
         echo "No network connection."
