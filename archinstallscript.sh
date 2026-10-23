@@ -28,7 +28,7 @@ main () {
 }
 
 #############################
-###    SCRIPT FUNCTION    ###
+###    SCRIPT FUNCTIONS   ###
 #############################
 
 verify_info () {
@@ -41,9 +41,9 @@ verify_info () {
   echo "Timezone: $time_zone"
   echo "Locale: $locale"
   echo "Disk: $DISK"
-  read -p "Is the information above correct?" correct_info
+  read -p "Is the information above correct?: " correct_info
   if [[ "${correct_info^^}" = "Y" ]]; then
-    read -p "Proceed with install?" proceed_install
+    read -p "Proceed with install?: " proceed_install
     if [[ "${proceed_install^^}" = "Y" ]]; then
       return 0
     elif [[ "${proceed_install^^}" = "N" ]]; then
@@ -246,14 +246,28 @@ cleanup () {
 ###       USER SETUP      ###
 #############################
 
+
+
 get_user () {
   while true; do
     read -p "Do you want to create a local user and disable root login? (Y/N): " create_user_input
     if [[ "${create_user_input^^}" == "Y" ]]; then
-      read -p "Enter your desired username (Default > local.user): " username_input
-      username=${username_input:-local.user}
-      password_confirm
-      break
+      while true; do
+        read -p "Enter your desired username (Default > local.user): " username_input
+        username=${username_input:-local.user}
+        if [[ ! "$username" =~ ^[a-z_][a-z0-9._-]{0,31}$ ]] || [[ "$username" =~ [.-]$ ]]; then
+          echo "Invalid username."
+          echo "Usernames must:"
+          echo "  - Start with a lowercase letter or underscore"
+          echo "  - Contain only lowercase letters, numbers, ., _, or -"
+          echo "  - Not end with . or -"
+          echo "  - Be 32 characters or fewer"
+          continue
+        fi
+        password_confirm
+        break
+      done
+    break
     elif [[ "${create_user_input^^}" == "N" ]]; then
       echo "Using root user only."
       password_confirm
