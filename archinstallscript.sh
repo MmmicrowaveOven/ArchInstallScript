@@ -223,7 +223,8 @@ create_user () {
   arch-chroot /mnt useradd -m -G wheel -s /bin/bash "$username"
   echo "$username:$password" | arch-chroot /mnt chpasswd
   arch-chroot /mnt sed -i 's/^# *\(%wheel ALL=(ALL:ALL) ALL\)$/\1/' /etc/sudoers
-  arch-chroot /mnt sed -i '/^[[:space:]]*#/b; /^[[:space:]]*$/b; s/^/# /' /etc/securetty
+  arch-chroot /mnt passwd -d root
+  arch-chroot /mnt passwd --locl root
 }
 
 main
