@@ -5,11 +5,14 @@ trap 'echo "Command failed: $BASH_COMMAND"' ERR
 main () {
   check_platform
   check_networking
-  get_hostname
-  get_timezone
-  get_locale
-  get_user
-  verify_disk_deletion
+  while true; do
+    get_hostname
+    get_timezone
+    get_locale
+    get_user
+    verify_disk_deletion
+    verify_info && break
+  done
   partition_disk
   install_system
   create_fstab
@@ -22,6 +25,33 @@ main () {
   fi
   install_grub
   cleanup
+}
+
+#############################
+###    SCRIPT FUNCTION    ###
+#############################
+
+verify_info () {
+  echo "Hostname: $system_hostname"
+  if [[ "${create_user_input^^}" == "Y" ]]; then
+    echo "Username (root disabled): $username"
+  else
+    echo "Username (no local user): $root"
+  fi
+  echo "Timezone: $time_zone"
+  echo "Locale: $locale"
+  echo "Disk: $DISK"
+  read -p "Is the information above correct?" correct_info
+  if [[ "${correct_info^^}" = "Y" ]]; then
+    read -p "Proceed with install?" proceed_install
+    if [[ "${proceed_install^^}" = "Y" ]]; then
+      return 0
+    elif [[ "${proceed_install^^}" = "N" ]]; then
+      echo "Canceling..."
+      exit
+  elif [[ "${correct_info^^}" = "N" ]]; then
+    return 1
+  fi
 }
 
 #############################
