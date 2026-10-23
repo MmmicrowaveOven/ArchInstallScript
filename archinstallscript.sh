@@ -28,12 +28,39 @@ verify_platform () {
 }
 
 gather_input () {
-  read -p "Enter your desired hostname (Default > archlinux): " input
-  system_hostname=${input:-archlinux}
-  read -p "Enter time zone (Default > America/New_York): " input
-  time_zone=${input:-America/New_York}
-  read -p "Enter UTF-8 locale (Default > en_US): " input
-  locale=${input:-en_US}
+  read -p "Enter your desired hostname (Default > archlinux): " hostname_input
+  system_hostname=${hostname_input:-archlinux}
+  read -p "Enter time zone (Default > America/New_York): " tz_input
+  time_zone=${tz_input:-America/New_York}
+  read -p "Enter UTF-8 locale (Default > en_US): " locale_input
+  locale=${locale_nput:-en_US}
+  read -p "Do you want to create a local user and disable root login? (Y/N): " create_user_input
+  if [[ "${create_user_input^^}" == "Y" ]]; then
+    read -p "Enter your desired username (Default > local.user): " username_input
+    username=${username_input:-local.user}
+    while true; do
+      read -s "Enter your desired password: " password_input_1
+      read -s "Confirm your desired password: " password_input_2
+      if [[ "$password_input_1" == "$password_input_2" ]]; then
+        echo "Passwords match."
+        user_password="$password_input_1"
+        break
+      else
+        echo "Password do not match. Try again."
+    done
+  elif [[ "${create_user_input^^}" == "N" ]]; then
+    echo "Using root user only."
+    while true; do
+      read -s "Enter your desired password: " password_input_1
+      read -s "Confirm your desired password: " password_input_2
+      if [[ "$password_input_1" == "$password_input_2" ]]; then
+        echo "Passwords match."
+        root_password="$password_input_1"
+        break
+      else
+        echo "Password do not match. Try again."
+    done
+  fi
 }
 
 verify_disk_deletion () {
@@ -130,6 +157,13 @@ system_prep () {
   echo "Grub installed."
   echo "Set root user password:"
   arch-chroot /mnt passwd
+}
+
+create_user () {
+  arch-chroot /mnt useradd -m -G wheel -s /bin/bash "$username"
+  arch-chroot /mnt echo "$user_password" | passwd "$username" --stdin
+  arch-chroot /mnt sed -i 's/^# *\(%wheel ALL=(ALL:ALL) ALL\)$/\1/' /etc/sudoers
+  arch-chroot /mnt sed -i '/^[[:space:]]*#/b; /^[[:space:]]*$/b; s/^/# /' /etc/securetty
 }
 
 cleanup () {
