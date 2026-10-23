@@ -1,9 +1,10 @@
 #!/bin/bash
 set -euo pipefail
-trap 'echo "Installation failed on line $LINENO."' ERR
+trap 'echo "Command failed: $BASH_COMMAND"' ERR
 
 main () {
   check_platform
+  check_networking
   get_hostname
   get_timezone
   get_locale
@@ -43,8 +44,13 @@ check_platform () {
   fi
 }
 
-check_networking () {
-  if [
+check_networking() {
+    if ping -c1 archlinux.org >/dev/null 2>&1; then
+        echo "Network connectivity confirmed."
+    else
+        echo "No network connection."
+        exit 1
+    fi
 }
 
 #############################
@@ -62,6 +68,8 @@ verify_disk_deletion () {
       elif [[ "$(lsblk -dn -o TYPE "$DISK")" != "disk" ]]; then
         echo "Please select a whole disk."
         continue
+      else
+        break
       fi
     done
     while true; do
@@ -78,6 +86,7 @@ verify_disk_deletion () {
 
 partition_disk () {
   wipefs -af "$DISK" > /dev/null
+  sgdisk --zap-all "$DISK"
   sfdisk "$DISK" <<'EOF'
   label: gpt
 
@@ -126,18 +135,19 @@ get_hostname () {
 get_timezone () {
   while true; do
     read -p "Enter time zone (Default > America/New_York): " tz_input
-    if [[ -f "/usr/share/zoneinfo/$time_zone" ]]; then
+    if [[ -f "/usr/share/zoneinfo/$tz_input" ]]; then
       time_zone=${tz_input:-America/New_York}
       break
     else
       echo "Invalid input. Try again."
+    fi
   done
 }
 
 get_locale () {
   while true; do
     read -p "Enter UTF-8 locale (Default > en_US): " locale_input
-    if grep -q "^#\?${locale}\.UTF-8" /mnt/etc/locale.gen; then
+    if grep -q "^#\?${locale_input}\.UTF-8" /etc/locale.gen; then
       locale=${locale_input:-en_US}
       break
     else
@@ -230,6 +240,7 @@ password_confirm () {
       read -s -p "Confirm your desired password: " password_input_2
       echo
       if [[ "$password_input_1" == "$password_input_2" ]]; then
+        unset password_input_1 password_input_2
         echo "Passwords match."
         password="$password_input_1"
         break
