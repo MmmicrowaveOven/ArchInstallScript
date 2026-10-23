@@ -43,6 +43,10 @@ check_platform () {
   fi
 }
 
+check_networking () {
+  if [
+}
+
 #############################
 ###       DISK SETUP      ###
 #############################
@@ -58,8 +62,6 @@ verify_disk_deletion () {
       elif [[ "$(lsblk -dn -o TYPE "$DISK")" != "disk" ]]; then
         echo "Please select a whole disk."
         continue
-      elif [[ -b "$DISK" ]]; then
-        break
       fi
     done
     while true; do
@@ -87,22 +89,16 @@ EOF
   partprobe "$DISK" > /dev/null
   udevadm settle
   if [[ "$DISK" =~ (nvme|mmcblk) ]]; then
-    mkfs.fat -F32 "${DISK}"p1 > /dev/null
-    mkswap "${DISK}"p2 > /dev/null
-    mkfs.ext4 "${DISK}"p3 > /dev/null
-    mount "${DISK}"p3 /mnt > /dev/null
-    mount --mkdir "${DISK}"p1 /mnt/boot > /dev/null
-    swapon "${DISK}"p2 > /dev/null
-  elif [[ "$DISK" =~ sd ]]; then
-    mkfs.fat -F32 "${DISK}"1 > /dev/null
-    mkswap "${DISK}"2 > /dev/null
-    mkfs.ext4 "${DISK}"3 > /dev/null
-    mount "${DISK}"3 /mnt > /dev/null
-    mount --mkdir "${DISK}"1 /mnt/boot > /dev/null
-    swapon "${DISK}"2 > /dev/null
+    part_suffix="p"
   else
-    exit
+    part_suffix=""
   fi
+  mkfs.fat -F32 "${DISK}${part_suffix}"1 > /dev/null
+  mkswap "${DISK}${part_suffix}"2 > /dev/null
+  mkfs.ext4 "${DISK}${part_suffix}"3 > /dev/null
+  mount "${DISK}${part_suffix}"3 /mnt > /dev/null
+  mount --mkdir "${DISK}${part_suffix}"1 /mnt/boot > /dev/null
+  swapon "${DISK}${part_suffix}"2 > /dev/null
 }
 
 #############################
@@ -110,18 +106,44 @@ EOF
 #############################
 
 get_hostname () {
-  read -p "Enter your desired hostname (Default > archlinux): " hostname_input
-  system_hostname=${hostname_input:-archlinux}
+  while true; do
+    read -p "Enter your desired hostname (Default > archlinux): " hostname_input
+    system_hostname=${hostname_input:-archlinux}
+    if [[ ${#system_hostname} -gt 63 ]]; then
+      echo "Hostname must be 63 characters or fewer."
+      continue
+    fi
+    if [[ ! "$system_hostname" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]]; then
+      echo "Invalid hostname."
+      echo "Only letters, numbers, periods, and hyphens are allowed."
+      echo "Hostname cannot begin or end with a period or hyphen."
+      continue
+    fi
+    break
+  done
 }
 
 get_timezone () {
-  read -p "Enter time zone (Default > America/New_York): " tz_input
-  time_zone=${tz_input:-America/New_York}
+  while true; do
+    read -p "Enter time zone (Default > America/New_York): " tz_input
+    if [[ -f "/usr/share/zoneinfo/$time_zone" ]]; then
+      time_zone=${tz_input:-America/New_York}
+      break
+    else
+      echo "Invalid input. Try again."
+  done
 }
 
 get_locale () {
-  read -p "Enter UTF-8 locale (Default > en_US): " locale_input
-  locale=${locale_input:-en_US}
+  while true; do
+    read -p "Enter UTF-8 locale (Default > en_US): " locale_input
+    if grep -q "^#\?${locale}\.UTF-8" /mnt/etc/locale.gen; then
+      locale=${locale_input:-en_US}
+      break
+    else
+      echo "Invalid input. Try again."
+    fi
+  done
 }
 
 install_system () {
@@ -204,7 +226,9 @@ get_user () {
 password_confirm () {
     while true; do
       read -s -p "Enter your desired password: " password_input_1
+      echo
       read -s -p "Confirm your desired password: " password_input_2
+      echo
       if [[ "$password_input_1" == "$password_input_2" ]]; then
         echo "Passwords match."
         password="$password_input_1"
@@ -224,7 +248,7 @@ create_user () {
   echo "$username:$password" | arch-chroot /mnt chpasswd
   arch-chroot /mnt sed -i 's/^# *\(%wheel ALL=(ALL:ALL) ALL\)$/\1/' /etc/sudoers
   arch-chroot /mnt passwd -d root
-  arch-chroot /mnt passwd --locl root
+  arch-chroot /mnt passwd --lock root
 }
 
 main
