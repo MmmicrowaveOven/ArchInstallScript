@@ -49,6 +49,7 @@ verify_info () {
     elif [[ "${proceed_install^^}" = "N" ]]; then
       echo "Canceling..."
       exit
+    fi
   elif [[ "${correct_info^^}" = "N" ]]; then
     return 1
   fi
