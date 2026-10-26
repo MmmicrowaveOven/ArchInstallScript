@@ -307,4 +307,19 @@ create_user () {
   arch-chroot /mnt passwd --lock root
 }
 
+#############################
+###      DE INSTALLS      ###
+#############################
+
+#############################
+###      APP INSTALLS     ###
+#############################
+paru-install {
+  arch-chroot /mnt pacman -S --needed base-devel
+  arch-chroot /mnt git clone https://aur.archlinux.org/paru.git
+  arch-chroot /mnt cd paru
+  arch-chroot /mnt makepkg -si
+}
+
+
 main
