@@ -76,7 +76,7 @@ check_platform () {
 }
 
 check_networking() {
-    if ping -c1 archlinux.org >/dev/null 2>&1; then
+    if ping -c1 archlinux.org; then
         echo "Network connectivity confirmed."
     else
         echo "No network connection."
@@ -93,7 +93,7 @@ verify_disk_deletion () {
     while true; do
       lsblk
       read -p "Enter the disk identifier to install Arch Linux. THIS DISK WILL BE WIPED. (e.g., /dev/sdX): " DISK
-      if ! lsblk -dn -o TYPE "$DISK" >/dev/null 2>&1; then
+      if ! lsblk -dn -o TYPE "$DISK"; then
         echo "Invalid block device."
         continue
       elif [[ "$(lsblk -dn -o TYPE "$DISK")" != "disk" ]]; then
@@ -116,7 +116,7 @@ verify_disk_deletion () {
 }
 
 partition_disk () {
-  wipefs -af "$DISK" > /dev/null
+  wipefs -af "$DISK"
   sgdisk --zap-all "$DISK"
   sfdisk "$DISK" <<'EOF'
   label: gpt
@@ -126,19 +126,19 @@ partition_disk () {
   type=linux
 EOF
     
-  partprobe "$DISK" > /dev/null
+  partprobe "$DISK"
   udevadm settle
   if [[ "$DISK" =~ (nvme|mmcblk) ]]; then
     part_suffix="p"
   else
     part_suffix=""
   fi
-  mkfs.fat -F32 "${DISK}${part_suffix}"1 > /dev/null
-  mkswap "${DISK}${part_suffix}"2 > /dev/null
-  mkfs.ext4 "${DISK}${part_suffix}"3 > /dev/null
-  mount "${DISK}${part_suffix}"3 /mnt > /dev/null
-  mount --mkdir "${DISK}${part_suffix}"1 /mnt/boot > /dev/null
-  swapon "${DISK}${part_suffix}"2 > /dev/null
+  mkfs.fat -F32 "${DISK}${part_suffix}"1
+  mkswap "${DISK}${part_suffix}"2
+  mkfs.ext4 "${DISK}${part_suffix}"3
+  mount "${DISK}${part_suffix}"3 /mnt
+  mount --mkdir "${DISK}${part_suffix}"1 /mnt/boot
+  swapon "${DISK}${part_suffix}"2
 }
 
 #############################
@@ -189,8 +189,8 @@ get_locale () {
 
 install_system () {
   echo "Installing base system..."
-  pacstrap -K /mnt base linux linux-firmware nano networkmanager vi sudo grub efibootmgr  > /dev/null
-  arch-chroot /mnt systemctl enable NetworkManager > /dev/null
+  pacstrap -K /mnt base linux linux-firmware nano networkmanager vi sudo grub efibootmgr
+  arch-chroot /mnt systemctl enable NetworkManager
   echo "Base system installed."
 }
 
@@ -202,10 +202,10 @@ create_fstab () {
 
 localize_system () {
   echo "Setting locales..."
-  arch-chroot /mnt ln -sf /usr/share/zoneinfo/"$time_zone" /etc/localtime > /dev/null
-  arch-chroot /mnt hwclock --systohc > /dev/null
+  arch-chroot /mnt ln -sf /usr/share/zoneinfo/"$time_zone" /etc/localtime
+  arch-chroot /mnt hwclock --systohc
   arch-chroot /mnt sed -i "/${locale}\.UTF-8/s/^#\s*//" /etc/locale.gen
-  arch-chroot /mnt locale-gen > /dev/null
+  arch-chroot /mnt locale-gen
   echo "LANG=${locale}.UTF-8" > /mnt/etc/locale.conf
   echo 'KEYMAP=us' > /mnt/etc/vconsole.conf
   echo "Enabling NTP..."
@@ -223,11 +223,11 @@ set_hostname () {
 install_grub () {
   echo "Installing grub..."
   if [[ "$platform_size" == "64" ]]; then
-    arch-chroot /mnt grub-install --removable --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB > /dev/null
+    arch-chroot /mnt grub-install --removable --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
   elif [[ "$platform_size" == "32" ]]; then
-    arch-chroot /mnt grub-install --removable --target=i386-efi --efi-directory=/boot --bootloader-id=GRUB > /dev/null
+    arch-chroot /mnt grub-install --removable --target=i386-efi --efi-directory=/boot --bootloader-id=GRUB
   fi
-  arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg > /dev/null
+  arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
   echo "Grub installed."
 }
 
