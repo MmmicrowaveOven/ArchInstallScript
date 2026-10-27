@@ -116,6 +116,8 @@ verify_disk_deletion () {
       fi
       echo "Invalid input, try again"
     done
+    while true; do
+      read -p "What file system do you want to use? (Input a single number.)\n1. EXT4\n2. BTRFS"
   done
 }
 
