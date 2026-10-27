@@ -224,6 +224,18 @@ verify_info () {
 }
 
 #############################
+###    BG GATHER INFOR    ###
+#############################
+# This function gathers the CPU brand to install microcode in later pacstrap command.
+gather_cpu_info() {
+  if cat /proc/cpuinfo | grep "Intel"; then
+    cpu_type="intel"
+  elif cat /proc/cpuinfo | grep "AMD"; then
+    cpu_type="amd"
+  fi
+}
+
+#############################
 ###       DISK SETUP      ###
 #############################
 
@@ -292,7 +304,7 @@ EOF
 # This function install the base, necessary componenets to run arch linux.
 install_system () {
   echo "Installing base system..."
-  pacstrap -K /mnt base linux linux-firmware nano networkmanager vi sudo grub efibootmgr base-devel git
+  pacstrap -K /mnt base linux linux-firmware nano networkmanager vi sudo grub efibootmgr base-devel git "${cpu_type}"-ucode
   arch-chroot /mnt systemctl enable NetworkManager
   echo "Base system installed."
 }
