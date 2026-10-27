@@ -28,35 +28,6 @@ main () {
 }
 
 #############################
-###    SCRIPT FUNCTIONS   ###
-#############################
-
-# This function checks that the user provided info is what they are wanting.
-verify_info () {
-  echo "Hostname: $system_hostname"
-  if [[ "${create_user_input^^}" == "Y" ]]; then
-    echo "Username (root disabled): $username"
-  else
-    echo "Username (no local user): $root"
-  fi
-  echo "Timezone: $time_zone"
-  echo "Locale: $locale"
-  echo "Disk: $DISK"
-  read -p "Is the information above correct?: " correct_info
-  if [[ "${correct_info^^}" = "Y" ]]; then
-    read -p "Proceed with install?: " proceed_install
-    if [[ "${proceed_install^^}" = "Y" ]]; then
-      return 0
-    elif [[ "${proceed_install^^}" = "N" ]]; then
-      echo "Canceling..."
-      exit
-    fi
-  elif [[ "${correct_info^^}" = "N" ]]; then
-    return 1
-  fi
-}
-
-#############################
 ###     SYSTEM CHECKS     ###
 #############################
 
@@ -88,70 +59,8 @@ check_networking() {
 }
 
 #############################
-###       DISK SETUP      ###
+###     GATHER INFO      ###
 #############################
-
-# This function verifies the disk the user wants to install on, and verifies that the disks exists.
-verify_disk_deletion () {
-  while true; do
-    while true; do
-      lsblk
-      read -p "Enter the disk identifier to install Arch Linux. THIS DISK WILL BE WIPED. (e.g., /dev/sdX): " DISK
-      if ! lsblk -dn -o TYPE "$DISK"; then
-        echo "Invalid block device."
-        continue
-      elif [[ "$(lsblk -dn -o TYPE "$DISK")" != "disk" ]]; then
-        echo "Please select a whole disk."
-        continue
-      else
-        break
-      fi
-    done
-    while true; do
-      read -p 'ARE YOU SURE YOU WANT TO WIPE THIS DISK? ALL DATA WILL BE DELETED. "Y" WILL CONTINUE, "N" WILL GO BACK TO DEVICE SELECTION: ' verify_wipe_disk
-      if [[ "${verify_wipe_disk^^}" == "Y" ]]; then
-        return
-      elif [[ "${verify_wipe_disk^^}" == "N" ]]; then
-        continue 2
-      fi
-      echo "Invalid input, try again"
-    done
-    while true; do
-      read -p "What file system do you want to use? (Input a single number.)\n1. EXT4\n2. BTRFS"
-  done
-}
-
-# This device wipes and mounts the selected disk.
-partition_disk () {
-  wipefs -af "$DISK"
-  sgdisk --zap-all "$DISK"
-  sfdisk "$DISK" <<'EOF'
-  label: gpt
-
-  size=1G, type=uefi
-  size=8G, type=swap
-  type=linux
-EOF
-    
-  partprobe "$DISK"
-  udevadm settle
-  if [[ "$DISK" =~ (nvme|mmcblk) ]]; then
-    part_suffix="p"
-  else
-    part_suffix=""
-  fi
-  mkfs.fat -F32 "${DISK}${part_suffix}"1
-  mkswap "${DISK}${part_suffix}"2
-  mkfs.ext4 "${DISK}${part_suffix}"3
-  mount "${DISK}${part_suffix}"3 /mnt
-  mount --mkdir "${DISK}${part_suffix}"1 /mnt/boot
-  swapon "${DISK}${part_suffix}"2
-}
-
-#############################
-###      SYSTEM SETUP     ###
-#############################
-
 # This function gathers what hostname the user wants, and verifies that it is a "legal" hostname.
 get_hostname () {
   while true; do
@@ -196,71 +105,6 @@ get_locale () {
     fi
   done
 }
-
-# This function install the base, necessary componenets to run arch linux.
-install_system () {
-  echo "Installing base system..."
-  pacstrap -K /mnt base linux linux-firmware nano networkmanager vi sudo grub efibootmgr base-devel git
-  arch-chroot /mnt systemctl enable NetworkManager
-  echo "Base system installed."
-}
-
-# This function generates the fstab file.
-create_fstab () {
-  echo "Generating file /etc/fstab."
-  genfstab -U /mnt > /mnt/etc/fstab
-  echo "File /etc/fstab generated."
-}
-
-# This function handles the localization of the system.
-localize_system () {
-  echo "Setting locales..."
-  arch-chroot /mnt ln -sf /usr/share/zoneinfo/"$time_zone" /etc/localtime
-  arch-chroot /mnt hwclock --systohc
-  arch-chroot /mnt sed -i "/${locale}\.UTF-8/s/^#\s*//" /etc/locale.gen
-  arch-chroot /mnt locale-gen
-  echo "LANG=${locale}.UTF-8" > /mnt/etc/locale.conf
-  echo 'KEYMAP=us' > /mnt/etc/vconsole.conf
-  echo "Enabling NTP..."
-  arch-chroot /mnt timedatectl set-ntp true
-  echo "NTP enabled."
-  echo "Locales set."
-}
-
-# This function sets the device hostname.
-set_hostname () {
-  echo "Setting hostname..."
-  echo "$system_hostname" > /mnt/etc/hostname
-  echo "Hostname set."
-}
-
-# This function installs the grub bootloader.
-install_grub () {
-  echo "Installing grub..."
-  if [[ "$platform_size" == "64" ]]; then
-    arch-chroot /mnt grub-install --removable --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
-  elif [[ "$platform_size" == "32" ]]; then
-    arch-chroot /mnt grub-install --removable --target=i386-efi --efi-directory=/boot --bootloader-id=GRUB
-  fi
-  arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
-  echo "Grub installed."
-}
-
-# This function unmounts partitions and restarts the device.
-cleanup () {
-  swapoff -a
-  umount -R /mnt
-  sync
-  echo "Remove media then press enter to reboot."
-  read -s -n 1
-  echo "Rebooting..."
-  sleep 2
-  reboot
-}
-
-#############################
-###       USER SETUP      ###
-#############################
 
 # This function gathers whether the user wants to setup root or a sudo user and verifies the "legality" of usernames and passwords.
 get_user () {
@@ -311,6 +155,177 @@ password_confirm () {
     done
 }
 
+# This function verifies the disk the user wants to install on, and verifies that the disks exists.
+verify_disk_deletion () {
+  while true; do
+    while true; do
+      lsblk
+      read -p "Enter the disk identifier to install Arch Linux. THIS DISK WILL BE WIPED. (e.g., /dev/sdX): " DISK
+      if ! lsblk -dn -o TYPE "$DISK"; then
+        echo "Invalid block device."
+        continue
+      elif [[ "$(lsblk -dn -o TYPE "$DISK")" != "disk" ]]; then
+        echo "Please select a whole disk."
+        continue
+      else
+        break
+      fi
+    done
+    while true; do
+      read -p 'ARE YOU SURE YOU WANT TO WIPE THIS DISK? ALL DATA WILL BE DELETED. "Y" WILL CONTINUE, "N" WILL GO BACK TO DEVICE SELECTION: ' verify_wipe_disk
+      if [[ "${verify_wipe_disk^^}" == "Y" ]]; then
+        return
+      elif [[ "${verify_wipe_disk^^}" == "N" ]]; then
+        continue 2
+      fi
+      echo "Invalid input, try again"
+    done
+  done
+}
+
+# Gathers the desired file system type.
+verifiy_format() {
+    while true; do
+      read -p "What file system do you want to use? (Input a single number.)\n1. BTRFS (recommended)\n2. EXT4" fs_input
+      if [[ "${fs_input}" == "1" ]]; then
+        fs_type="btrfs"
+        break
+      elif [[ "${fs_input}" == "2" ]]; then
+        fs_type="btrfs"
+        break
+      else
+        echo "Invalid input, please try again."
+    done
+}
+
+# This function checks that the user provided info is what they are wanting.
+verify_info () {
+  echo "Hostname: $system_hostname"
+  if [[ "${create_user_input^^}" == "Y" ]]; then
+    echo "Username (root disabled): $username"
+  else
+    echo "Username (no local user): $root"
+  fi
+  echo "Timezone: $time_zone"
+  echo "Locale: $locale"
+  echo "Disk: $DISK"
+  read -p "Is the information above correct?: " correct_info
+  if [[ "${correct_info^^}" = "Y" ]]; then
+    read -p "Proceed with install?: " proceed_install
+    if [[ "${proceed_install^^}" = "Y" ]]; then
+      return 0
+    elif [[ "${proceed_install^^}" = "N" ]]; then
+      echo "Canceling..."
+      exit
+    fi
+  elif [[ "${correct_info^^}" = "N" ]]; then
+    return 1
+  fi
+}
+
+#############################
+###       DISK SETUP      ###
+#############################
+
+# This function wipes and mounts the selected disk.
+partition_disk_ext4 () {
+  wipefs -af "$DISK"
+  sgdisk --zap-all "$DISK"
+  sfdisk "$DISK" <<'EOF'
+  label: gpt
+
+  size=1G, type=uefi
+  size=8G, type=swap
+  type=linux
+EOF
+    
+  partprobe "$DISK"
+  udevadm settle
+  if [[ "$DISK" =~ (nvme|mmcblk) ]]; then
+    part_suffix="p"
+  else
+    part_suffix=""
+  fi
+  mkfs.fat -F32 "${DISK}${part_suffix}"1
+  mkswap "${DISK}${part_suffix}"2
+  mkfs.ext4 "${DISK}${part_suffix}"3
+  mount "${DISK}${part_suffix}"3 /mnt
+  mount --mkdir "${DISK}${part_suffix}"1 /mnt/boot
+  swapon "${DISK}${part_suffix}"2
+  efi_directory="/boot"
+}
+
+partition_disk_btrfs () {
+  wipefs -af "$DISK"
+  sgdisk --zap-all "$DISK"
+  sfdisk "$DISK" <<'EOF'
+  label: gpt
+
+  size=1G, type=uefi
+  type=linux
+EOF
+    
+  partprobe "$DISK"
+  udevadm settle
+  if [[ "$DISK" =~ (nvme|mmcblk) ]]; then
+    part_suffix="p"
+  else
+    part_suffix=""
+  fi
+  mkfs.fat -F32 "${DISK}${part_suffix}"1
+  mkfs.btrfs "${DISK}${part_suffix}"2
+  mount "${DISK}${part_suffix}"2 /mnt
+  btrfs subvolume create /mnt/@
+  btrfs subvolume create /mnt/@home
+  umount /mnt
+  mount -o compress=zstd,subvol=@ /dev/nvme0n1p2 /mnt
+  mkdir -p /mnt/home
+  mount -o compress=zstd,subvol=@home /dev/nvme0n1p2 /mnt/home
+  mkdir -p /mnt/efi
+  mount /dev/nvme0n1p1 /mnt/efi
+  efi_directory="/efi"
+}
+#############################
+###      SYSTEM SETUP     ###
+#############################
+
+# This function install the base, necessary componenets to run arch linux.
+install_system () {
+  echo "Installing base system..."
+  pacstrap -K /mnt base linux linux-firmware nano networkmanager vi sudo grub efibootmgr base-devel git
+  arch-chroot /mnt systemctl enable NetworkManager
+  echo "Base system installed."
+}
+
+# This function generates the fstab file.
+create_fstab () {
+  echo "Generating file /etc/fstab."
+  genfstab -U /mnt > /mnt/etc/fstab
+  echo "File /etc/fstab generated."
+}
+
+# This function handles the localization of the system.
+localize_system () {
+  echo "Setting locales..."
+  arch-chroot /mnt ln -sf /usr/share/zoneinfo/"$time_zone" /etc/localtime
+  arch-chroot /mnt hwclock --systohc
+  arch-chroot /mnt sed -i "/${locale}\.UTF-8/s/^#\s*//" /etc/locale.gen
+  arch-chroot /mnt locale-gen
+  echo "LANG=${locale}.UTF-8" > /mnt/etc/locale.conf
+  echo 'KEYMAP=us' > /mnt/etc/vconsole.conf
+  echo "Enabling NTP..."
+  arch-chroot /mnt timedatectl set-ntp true
+  echo "NTP enabled."
+  echo "Locales set."
+}
+
+# This function sets the device hostname.
+set_hostname () {
+  echo "Setting hostname..."
+  echo "$system_hostname" > /mnt/etc/hostname
+  echo "Hostname set."
+}
+
 # This function sets up the root user for use.
 setup_root () {
   echo "root:$password" | arch-chroot /mnt chpasswd
@@ -323,6 +338,30 @@ create_user () {
   arch-chroot /mnt sed -i 's/^# *\(%wheel ALL=(ALL:ALL) ALL\)$/\1/' /etc/sudoers
   arch-chroot /mnt passwd -d root
   arch-chroot /mnt passwd --lock root
+}
+
+# This function installs the grub bootloader.
+install_grub () {
+  echo "Installing grub..."
+  if [[ "$platform_size" == "64" ]]; then
+    arch-chroot /mnt grub-install --removable --target=x86_64-efi --efi-directory="${efi_directory}" --bootloader-id=GRUB
+  elif [[ "$platform_size" == "32" ]]; then
+    arch-chroot /mnt grub-install --removable --target=i386-efi --efi-directory="${efi_directory}" --bootloader-id=GRUB
+  fi
+  arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
+  echo "Grub installed."
+}
+
+# This function unmounts partitions and restarts the device.
+cleanup () {
+  swapoff -a
+  umount -R /mnt
+  sync
+  echo "Remove media then press enter to reboot."
+  read -s -n 1
+  echo "Rebooting..."
+  sleep 2
+  reboot
 }
 
 #############################
