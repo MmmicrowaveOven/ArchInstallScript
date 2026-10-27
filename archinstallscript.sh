@@ -31,6 +31,7 @@ main () {
 ###    SCRIPT FUNCTIONS   ###
 #############################
 
+# This function checks that the user provided info is what they are wanting.
 verify_info () {
   echo "Hostname: $system_hostname"
   if [[ "${create_user_input^^}" == "Y" ]]; then
@@ -59,6 +60,7 @@ verify_info () {
 ###     SYSTEM CHECKS     ###
 #############################
 
+# THis function verifies that the system is booted in UEFI mode.
 check_platform () {
   if [[ ! -f /sys/firmware/efi/fw_platform_size ]]; then
     echo "This system is not running in UEFI mode. Press any key to reboot and try again."
@@ -75,6 +77,7 @@ check_platform () {
   fi
 }
 
+# This function verifies that the device is connected to internet.
 check_networking() {
     if ping -c1 archlinux.org; then
         echo "Network connectivity confirmed."
@@ -88,6 +91,7 @@ check_networking() {
 ###       DISK SETUP      ###
 #############################
 
+# This function verifies the disk the user wants to install on, and verifies that the disks exists.
 verify_disk_deletion () {
   while true; do
     while true; do
@@ -115,6 +119,7 @@ verify_disk_deletion () {
   done
 }
 
+# This device wipes and mounts the selected disk.
 partition_disk () {
   wipefs -af "$DISK"
   sgdisk --zap-all "$DISK"
@@ -145,6 +150,7 @@ EOF
 ###      SYSTEM SETUP     ###
 #############################
 
+# This function gathers what hostname the user wants, and verifies that it is a "legal" hostname.
 get_hostname () {
   while true; do
     read -p "Enter your desired hostname (Default > archlinux): " hostname_input
@@ -163,6 +169,7 @@ get_hostname () {
   done
 }
 
+# This function gathers the users desired timezone and verifies its existence.
 get_timezone () {
   while true; do
     read -p "Enter time zone (Default > America/New_York): " tz_input
@@ -175,6 +182,7 @@ get_timezone () {
   done
 }
 
+# This function gathers the users desired locale, and verifies it exists.
 get_locale () {
   while true; do
     read -p "Enter UTF-8 locale (Default > en_US): " locale_input
@@ -187,19 +195,22 @@ get_locale () {
   done
 }
 
+# This function install the base, necessary componenets to run arch linux.
 install_system () {
   echo "Installing base system..."
-  pacstrap -K /mnt base linux linux-firmware nano networkmanager vi sudo grub efibootmgr
+  pacstrap -K /mnt base linux linux-firmware nano networkmanager vi sudo grub efibootmgr base-devel git
   arch-chroot /mnt systemctl enable NetworkManager
   echo "Base system installed."
 }
 
+# This function generates the fstab file.
 create_fstab () {
   echo "Generating file /etc/fstab."
   genfstab -U /mnt > /mnt/etc/fstab
   echo "File /etc/fstab generated."
 }
 
+# This function handles the localization of the system.
 localize_system () {
   echo "Setting locales..."
   arch-chroot /mnt ln -sf /usr/share/zoneinfo/"$time_zone" /etc/localtime
@@ -214,12 +225,14 @@ localize_system () {
   echo "Locales set."
 }
 
+# This function sets the device hostname.
 set_hostname () {
   echo "Setting hostname..."
   echo "$system_hostname" > /mnt/etc/hostname
   echo "Hostname set."
 }
 
+# This function installs the grub bootloader.
 install_grub () {
   echo "Installing grub..."
   if [[ "$platform_size" == "64" ]]; then
@@ -231,6 +244,7 @@ install_grub () {
   echo "Grub installed."
 }
 
+# This function unmounts partitions and restarts the device.
 cleanup () {
   swapoff -a
   umount -R /mnt
@@ -246,8 +260,7 @@ cleanup () {
 ###       USER SETUP      ###
 #############################
 
-
-
+# This function gathers whether the user wants to setup root or a sudo user and verifies the "legality" of usernames and passwords.
 get_user () {
   while true; do
     read -p "Do you want to create a local user and disable root login? (Y/N): " create_user_input
@@ -278,6 +291,7 @@ get_user () {
   done
 }
 
+# This function gathers the user password and verifies that they match.
 password_confirm () {
     while true; do
       read -s -p "Enter your desired password: " password_input_1
@@ -295,10 +309,12 @@ password_confirm () {
     done
 }
 
+# This function sets up the root user for use.
 setup_root () {
   echo "root:$password" | arch-chroot /mnt chpasswd
 }
 
+# This function sets up a sudo user for use.
 create_user () {
   arch-chroot /mnt useradd -m -G wheel -s /bin/bash "$username"
   echo "$username:$password" | arch-chroot /mnt chpasswd
@@ -310,16 +326,43 @@ create_user () {
 #############################
 ###      DE INSTALLS      ###
 #############################
-
-#############################
-###      APP INSTALLS     ###
-#############################
-paru-install {
-  arch-chroot /mnt pacman -S --needed base-devel
-  arch-chroot /mnt git clone https://aur.archlinux.org/paru.git
-  arch-chroot /mnt cd paru
-  arch-chroot /mnt makepkg -si
+niri-install() {
+  arch-chroot /mnt 'pacman -S lightdm lightdm-gtk-greeter alacritty niri
+    systemctl enable lightdm
+  '
 }
 
+kde-install() {
+  arch-chroot /mnt 'pacman -S --noconfirm plasma konsole
+  systemctl enable sddm
+  '
+}
+
+gnome-install() {
+
+}
+#############################
+###      AUR INSTALLS     ###
+#############################
+paru-install() {
+  arch-chroot /mnt su - "$username" -c 'git clone https://aur.archlinux.org/paru.git
+    cd ~/paru
+    makepkg -s --noconfirm
+  '
+  arch-chroot /mnt 'pacman -U --noconfirm /home/'"$username"'/paru/paru-*
+  rm -rf /home/'"$username"'/paru
+  '
+  arch-chroot /mnt su - "$username" -c 'paru --gendb'
+}
+
+yay-install() {
+  arch-chroot /mnt su  "$username" -c 'git clone https://aur.archlinux.org/yay.git
+    cd yay
+    makepkg -s
+  '
+  arch-chroot /mnt 'pacman -U --noconfirm /home/'"$username"'/yay/yay-*
+  rm -rf /home/'"$username"'/yay
+  '
+}
 
 main
