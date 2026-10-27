@@ -339,7 +339,9 @@ kde-install() {
 }
 
 gnome-install() {
-
+  arch-chroot /mnt 'pacman -S --noconfirm gnome
+  systemctl enable gdm
+  '
 }
 #############################
 ###      AUR INSTALLS     ###
